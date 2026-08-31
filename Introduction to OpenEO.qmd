@@ -268,14 +268,14 @@ Change detection - see the difference between May and July
 ```{r}
 time_slice7 <- r %>% slice(t, 7) # Month of May
 time_slice7_ndvi <- time_slice7 %>% select("NDVI") # Select the NDVI band
-diff <- (time_slice5_ndvi - time_slice7_ndvi)
+diff <- (time_slice7_ndvi - time_slice5_ndvi)
 
 ggplot() + geom_stars(data = diff) +
         coord_equal() +
         theme_void() +
         scale_x_discrete(expand = c(0,0)) +
         scale_y_discrete(expand = c(0,0)) +
-        scale_fill_viridis_c(direction=-1) # yellow green areas: greening of the area, blue areas: loss of green
+        scale_fill_viridis_c(direction=1) # yellow green areas: greening of the area, blue areas: loss of green
 
 ```
 
@@ -301,7 +301,7 @@ To illustrate, I made a time-laps animation for the month of June for our area. 
 
 ![Fig 3: Time-laps of S2 in June 2018 for our study area.](./Media/Sentinel-2_L2A-1730713489482057-timelapse.gif)
 
-We see that atmospheric interference causes noise within the data. In order to make reliable time series, we need to perform (1) atmospheric corrections (cloud % filtering, cloud masking), converting band values from digital numbers (0-10000) to reflectance values (0-1). Gaps within the data have to be filled in (data imputation) to create regular time series for analysis. This is typically done with temporal and/or spatial interpolation, followed by smoothing.
+We see that atmospheric interference causes noise within the data. In order to make reliable time series, we need to perform atmospheric corrections (cloud % filtering, cloud masking), converting band values from digital numbers (0-10000) to reflectance values (0-1). Gaps within the data have to be filled in (data imputation) to create regular time series for analysis. This is typically done with temporal and/or spatial interpolation, followed by smoothing.
 
 ![Fig 4: Typical pre-processing steps before we can use Sentinel-2 satellite time series data. Image was generated with Gemini.](./Media/preprocessing%20workflow.png)
 
@@ -391,7 +391,7 @@ Set the parameters for the cube processing.
 # Set parameters 
 bands = c("B02","B03","B04", "B05", "B8A", "B11", "B12", "SCL") # SCL = scene classification layer
 
-time_range = list("2022-01-01", "2026-01-01") # Time range of one year.
+time_range = list("2022-01-01", "2026-01-01") # 5 years
 collection = "SENTINEL2_L2A"
 ```
 
@@ -445,9 +445,6 @@ for (i in 1:nrow(polygons_no_overlap[1,])) {
   
   # apply mask
   cube_masked = process$mask(col, mask)
-  
-  
-  
   
   # Calculate the different indices:
   ndvi = function(cube_masked, context) {
@@ -718,7 +715,68 @@ ggplot() +
   theme_minimal() 
 ```
 
-Evaluate the % of inudated pixels (within the polygon) over the years and plot the trend line.
+Visualize the relative frequency each year.
+
+```{r}
+# Extract the years from the time dimension ('t')
+time_vals <- st_get_dimension_values(result_stars, "t")
+# This works whether 't' consists of Dates, characters, or factors by grabbing the first 4 digits
+years <- substr(as.character(time_vals), 1, 4) 
+unique_years <- sort(unique(years))
+
+# Compute the inundation frequency proportion (0 to 1) for each year
+yearly_maps <- lapply(unique_years, function(yr) {
+  
+  target_times <- years == yr
+  
+  # Extract the indices where target is TRUE
+  true_indices <- which(target_times)
+
+  
+  
+  # Subset the time steps belonging to the current year
+  year_sub <- result_stars[, , ,true_indices]
+  
+  # Calculate the mean across the spatial grid (collapsing the time dimension).
+  # Since 1 = inundated and 0 = dry, the mean represents the frequency proportion.
+  st_apply(year_sub, c("x", "y"), mean, na.rm = TRUE)
+})
+
+# Combine the separate yearly maps into a single stars object
+result_combined <- do.call(c, yearly_maps)
+names(result_combined) <- unique_years # Name each attribute layer after its year
+
+# Merge the separate year attributes into a single 'year' dimension
+result_yearly_stars <- merge(result_combined)
+result_yearly_stars <- st_set_dimensions(result_yearly_stars, "attributes", names = "year")
+names(result_yearly_stars) <- "frequency" # Label the value column
+
+# Align the coordinate reference system (CRS) for your polygon overlay
+polygon_transformed <- st_transform(polygons_no_overlap[1,], st_crs(result_yearly_stars))
+
+# Plot the continuous yearly frequency using ggplot
+ggplot() +
+  geom_stars(data = result_yearly_stars) +
+  # Map the continuous frequency to a gradient matching your original colors
+  scale_fill_gradient(low = "tan",        # 0% Inundated (Always Dry)
+                      high = "blue",      # 100% Inundated (Always Flooded)
+                      limits = c(0, 1),
+                      labels = scales::percent, # Formats values as 0%, 50%, 100%
+                      name = "Inundation\nFrequency") +
+  # Add the red polygon boundary
+  geom_sf(data = polygon_transformed, 
+          fill = NA, 
+          color = "red",
+          linewidth = 0.8) +
+  # Facet the map layout by year instead of individual time steps
+  facet_wrap(~year) + 
+  theme_minimal() +
+  labs(title = "Annual Inundation Frequency Map",
+       x = "Longitude",
+       y = "Latitude")
+```
+
+Evaluate the % of inundated pixels (within the polygon) over the years and plot the trend line.
 
 ```{r}
 # Crop stars object to the polygon and calculate the mean for each time step
