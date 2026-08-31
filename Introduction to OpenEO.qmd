@@ -290,9 +290,15 @@ cir_attributes <- time_slice5 %>% select(c("B08", "B04", "B02")) # -> NIR-R-G
 rgb_stacked <- merge(rgb_attributes, name = "band")
 cir_stacked <- merge(cir_attributes, name = "band")
 
+# Convert stars object to terra object to visualize with plotRGB
+rgb_terra <- rast(rgb_stacked)
+cir_terra <- rast(cir_stacked)
+
 # 4. Plot as RGB (rgb = 1:3 maps Red->1, Green->2, Blue->3)
-plot(rgb_stacked, rgb = 1:3, main = "Sentinel-2 True Color (May 2018)")
-plot(cir_stacked, rgb = 1:3, main = "Sentinel-2 False Color CIR (May 2018)") # Healthy vegetation appears in vibrant, bright red tones. Bare soil and urban areas appear gray, blue, or cyan, while water appears dark blue or black.
+plotRGB(rgb_terra, r = 1, g = 2, b = 3, stretch = "lin", main = "Sentinel-2 True Color (Linear Stretch) - May 2018")
+
+plotRGB(cir_terra, r = 1, g = 2, b = 3, stretch = "lin", main = "Sentinel-2 False Color CIR (Linear Stretch) - May 2018")
+# Healthy vegetation appears in vibrant, bright red tones. Bare soil and urban areas appear gray, blue, or cyan, while water appears dark blue or black.
 ```
 
 We see "strange deviations in the NDVI trend" , whereby we would expect values to increase (NDVI follows the phenological cycle of vegetation) over the summer months and decrease in the winter months. For example, we same very low values in June 2018. This is we did not correct for atmospheric interference.
@@ -659,7 +665,7 @@ plot(r2)
 ```{r}
 ## Loading required package: abind
 ggplot() + geom_stars(data = r2["ndvi"]) +
-        facet_wrap(~t) + coord_equal() +
+        facet_wrap(~t,ncol=12) + coord_equal() +
         theme_void() +
         scale_x_discrete(expand = c(0,0)) +
         scale_y_discrete(expand = c(0,0)) +
