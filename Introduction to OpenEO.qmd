@@ -220,7 +220,7 @@ compute_result(result, format = "NetCDF", output_file = "./export/ndvi.nc", con 
 ## [1] "ndvi.nc"
 ```
 
-All commands before `compute_result()` can be executed without authentification; only `compute_result` asks for “real” computations on imagery, and requires authentication, so that the compute costs can be accounted for.
+All commands before `compute_result()` can be executed without authentication; only `compute_result` asks for “real” computations on imagery, and requires authentication, so that the compute costs can be accounted for.
 
 `compute_result` downloads the file locally, and we can now import it and plot it either by e.g. `ggplot2`
 
