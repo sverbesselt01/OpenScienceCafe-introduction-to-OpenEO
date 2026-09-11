@@ -1,7 +1,6 @@
 ---
 title: "Downloading datacubes from OpenEO"
 author: "Sebastiaan Verbesselt"
-format: html
 date: "`r Sys.Date()`"
 format: 
   html:
@@ -685,7 +684,9 @@ complete_cases <- complete.cases(df)
 df_clean <- df[complete_cases, ]
 
 # Prepare the prediction vector (as done above)
-pred_values <- as.vector(round(predict(tree_jussila, newdata = df_clean)))
+pred <- predict(tree_jussila, newdata = df_clean)
+pred_binary <- ifelse(pred[, "water"] > pred[, "dry"], 1, 0)
+pred_values <- as.vector(pred_binary)
 final_pred_vector <- rep(NA_real_, nrow(df))
 final_pred_vector[complete_cases] <- pred_values
 
